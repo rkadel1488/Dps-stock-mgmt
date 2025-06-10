@@ -1,0 +1,49 @@
+# This is an example of how the application's data could be stored in a YAML file.
+# This format is for data storage and configuration, not for building the application itself.
+
+# A list of all defined product types in the master list.
+productMasters:
+  - id: 1718035200001
+    name: "iPhone 15 Pro"
+    price: 999.99
+    vendor: "Apple"
+    bookPageNo: "A-101"
+    reorderLevel: 10
+    openingStock: 50
+    createdAt: "2025-06-10T12:00:00.000Z"
+
+  - id: 1718035200002
+    name: "Samsung Galaxy S25"
+    price: 899.00
+    vendor: "Samsung"
+    bookPageNo: "B-205"
+    reorderLevel: 15
+    openingStock: 40
+    createdAt: "2025-06-10T12:05:00.000Z"
+
+# A list of all stock purchase records.
+stockEntryRecords:
+  - id: 1718035800001
+    productName: "iPhone 15 Pro"
+    quantityReceived: 20
+    entryDate: "2025-06-11"
+    invoiceNumber: "INV-2025-001"
+    totalAmount: 19999.80
+    enteredAt: "2025-06-11T09:30:00.000Z"
+
+  - id: 1718035800002
+    productName: "Samsung Galaxy S25"
+    quantityReceived: 30
+    entryDate: "2025-06-11"
+    invoiceNumber: "INV-2025-002"
+    totalAmount: 26970.00
+    enteredAt: "2025-06-11T09:32:00.000Z"
+
+# A list of all issued product records.
+issuedRecords:
+  - id: 1718036100001
+    productName: "iPhone 15 Pro"
+    issuedQuantity: 5
+    issuedDate: "2025-06-12"
+    issuedAt: "2025-06-12T14:00:00.000Z"
+
