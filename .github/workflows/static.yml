@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DPS Store Management System</title>
+    
+    <!-- Generated on: June 10, 2025, in Nepal -->
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- html2pdf.js for PDF export functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- Custom CSS Styles -->
+    <style>
+        /* This style block contains all the custom CSS needed for the application. */
+        
+        /* Hide all pages by default */
+        .page {
+            display: none;
+        }
+
+        /* Show the active page */
+        .page.active {
+            display: block;
+        }
+
+        /* Default navigation button style */
+        .nav-button {
+            background-color: white;
+            color: #2563eb; /* Tailwind's blue-700 */
+            border: 1px solid #93c5fd; /* Tailwind's blue-300 */
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Active navigation button style */
+        .nav-button.active {
+            background-color: #2563eb; /* Tailwind's blue-600 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        /* Hover style for non-active buttons */
+        .nav-button:hover:not(.active) {
+            background-color: #eff6ff; /* Tailwind's blue-100 */
+        }
+
+        /* Styles for smooth modal transitions */
+        .modal-backdrop {
+            transition: opacity 300ms ease-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            transition: all 300ms ease-out;
+            transform: scale(0.95);
+            opacity: 0;
+        }
+
+        .modal-backdrop.active .modal-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="min-h-screen p-4 flex flex-col items-center">
+        <!-- Main Application Header -->
+        <header class="w-full max-w-5xl mb-6">
+             <h1 class="text-4xl font-bold text-gray-800 text-center">DPS Inventory Management System</h1>
+             <p class="text-center text-gray-500">A standalone local inventory tool with data persistence By - Design Studio Blueberry</p>
+        </header>
+
+        <!-- Navigation Buttons -->
+        <nav id="navigation-bar" class="flex justify-center flex-wrap gap-2 md:gap-4 mb-6 w-full max-w-5xl pb-2">
+            <button data-page="dashboard" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Dashboard</button>
+            <button data-page="product_master" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Product Master</button>
+            <button data-page="purchase" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Purchase</button>
+            <button data-page="issued" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Issued</button>
+            <button data-page="inventory_report" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Inventory Report</button>
+            <button data-page="stock_daily_entry" class="nav-button px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold whitespace-nowrap">Stock Daily Entry</button>
+        </nav>
+
+        <!-- Main Content Area: Page content will be injected here by JavaScript -->
+        <main id="app-container" class="w-full max-w-4xl">
+            <!-- Page containers. The 'active' class will be toggled by JS to show/hide pages. -->
+            <div id="dashboard-page" class="page"></div>
+            <div id="product_master-page" class="page"></div>
+            <div id="purchase-page" class="page"></div>
+            <div id="issued-page" class="page"></div>
+            <div id="inventory_report-page" class="page"></div>
+            <div id="stock_daily_entry-page" class="page"></div>
+        </main>
+    </div>
+
+    <!-- Modal containers. Modals are dynamically created and injected here. -->
+    <div id="modal-container"></div>
+
+    <!-- Main Application JavaScript -->
+    <script>
+    // This script block contains all the JavaScript logic for the application.
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- STATE MANAGEMENT ---
+        let products = []; 
+        let productMasters = []; 
+        let issuedRecords = []; 
+        let stockEntryRecords = []; 
+        
+        // Robustly load data from localStorage, handling potential parsing errors.
+        try {
+            products = JSON.parse(localStorage.getItem('products')) || []; 
+            productMasters = JSON.parse(localStorage.getItem('productMasters')) || []; 
+            issuedRecords = JSON.parse(localStorage.getItem('issuedRecords')) || []; 
+            stockEntryRecords = JSON.parse(localStorage.getItem('stockEntryRecords')) || []; 
+        } catch (error) {
+            console.error("Error parsing data from localStorage:", error);
+            // If data is corrupt, it's safer to start fresh.
+            products = [];
+            productMasters = [];
+            issuedRecords = [];
+            stockEntryRecords = [];
+        }
+
+        // Convert string dates back to Date objects after loading from localStorage
+        const parseDates = (records, dateKey) => records.forEach(r => { if(r[dateKey]) r[dateKey] = new Date(r[dateKey]); });
+        parseDates(products, 'createdAt');
+        parseDates(productMasters, 'createdAt');
+        parseDates(issuedRecords, 'issuedAt');
+        parseDates(stockEntryRecords, 'enteredAt');
+
+        let currentPage = 'dashboard';
+
+        // --- DOM ELEMENTS ---
+        const navigationBar = document.getElementById('navigation-bar');
+        const pageContainers = {
+            dashboard: document.getElementById('dashboard-page'),
+            product_master: document.getElementById('product_master-page'),
+            purchase: document.getElementById('purchase-page'),
+            issued: document.getElementById('issued-page'),
+            inventory_report: document.getElementById('inventory_report-page'),
+            stock_daily_entry: document.getElementById('stock_daily_entry-page'),
+        };
+        const modalContainer = document.getElementById('modal-container');
+
+        // --- DATA PERSISTENCE ---
+        const saveData = () => {
+            localStorage.setItem('products', JSON.stringify(products));
+            localStorage.setItem('productMasters', JSON.stringify(productMasters));
+            localStorage.setItem('issuedRecords', JSON.stringify(issuedRecords));
+            localStorage.setItem('stockEntryRecords', JSON.stringify(stockEntryRecords));
+        };
+
+        // --- HELPER FUNCTIONS ---
+        const formatDisplayDate = (dateObj) => {
+            if (dateObj instanceof Date && !isNaN(dateObj)) {
+                return dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+            return 'N/A';
+        };
+
+        const todayISO = () => new Date().toISOString().split('T')[0];
+
+        // --- NAVIGATION ---
+        const navigateTo = (page) => {
+            currentPage = page;
+            navigationBar.querySelectorAll('.nav-button').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
+            Object.values(pageContainers).forEach(container => container.classList.remove('active'));
+            if (pageContainers[page]) {
+                pageContainers[page].classList.add('active');
+                renderCurrentPage();
+            }
+        };
+
+        navigationBar.addEventListener('click', (e) => {
+            if (e.target.matches('.nav-button')) {
+                navigateTo(e.target.dataset.page);
+            }
+        });
+
+        // --- RENDER FUNCTIONS (The heart of the UI logic) ---
+        function renderCurrentPage() {
+            const container = pageContainers[currentPage];
+            if (!container) return;
+            container.innerHTML = '';
+            
+            switch (currentPage) {
+                case 'dashboard': renderDashboard(container); break;
+                case 'product_master': renderProductMaster(container); break;
+                case 'purchase': renderPurchase(container); break;
+                case 'issued': renderIssued(container); break;
+                case 'inventory_report': renderInventoryReport(container); break;
+                case 'stock_daily_entry': renderStockDailyEntry(container); break;
+            }
+        }
+        
+        // --- RENDER COMPONENT: PRODUCT MASTER ---
+        function renderProductMaster(container) {
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border border-gray-200">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Product Master List</h1>
+                    <div id="master-error" class="hidden"></div>
+                    <div class="mb-8 p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Define New Product Type</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <input id="newMasterProductName" type="text" placeholder="Product Name" class="p-3 border rounded-lg">
+                            <input id="newMasterProductPrice" type="number" step="0.01" placeholder="Default Price" class="p-3 border rounded-lg">
+                            <input id="newMasterProductVendor" type="text" placeholder="Vendor" class="p-3 border rounded-lg">
+                            <input id="newMasterProductBookPageNo" type="text" placeholder="Book Page No." class="p-3 border rounded-lg">
+                            <input id="newMasterProductReorderLevel" type="number" placeholder="Reorder Level" value="10" min="0" class="p-3 border rounded-lg">
+                            <input id="newMasterProductOpeningStock" type="number" placeholder="Opening Stock" value="0" min="0" class="p-3 border rounded-lg">
+                        </div>
+                        <button id="add-master-product-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">Add Product Type</button>
+                    </div>
+                    <div class="p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Defined Product Types</h2>
+                        <div id="product-master-list" class="overflow-x-auto"></div>
+                    </div>
+                </div>`;
+            renderProductMasterTable();
+            container.querySelector('#add-master-product-btn').addEventListener('click', handleAddMasterProduct);
+            // Add keydown listener for Enter key
+            const inputs = container.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        handleAddMasterProduct();
+                    }
+                });
+            });
+        }
+        
+        function renderProductMasterTable() {
+            const listContainer = document.getElementById('product-master-list');
+            if (!listContainer) return;
+            if (productMasters.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-gray-600 py-4">No product types defined yet.</p>`;
+                return;
+            }
+            const tableRows = [...productMasters]
+                .sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
+                .map((p, i) => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3">${i + 1}</td>
+                        <td class="p-3">${p.name}</td>
+                        <td class="p-3">$${p.price.toFixed(2)}</td>
+                        <td class="p-3">${p.vendor}</td>
+                        <td class="p-3">${p.bookPageNo}</td>
+                        <td class="p-3">${p.reorderLevel}</td>
+                    </tr>`).join('');
+            listContainer.innerHTML = `
+                <table class="min-w-full bg-white rounded-lg border">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="p-3 text-left text-sm font-semibold">Sno</th>
+                            <th class="p-3 text-left text-sm font-semibold">Product Name</th>
+                            <th class="p-3 text-left text-sm font-semibold">Price</th>
+                            <th class="p-3 text-left text-sm font-semibold">Vendor</th>
+                            <th class="p-3 text-left text-sm font-semibold">Book Page</th>
+                            <th class="p-3 text-left text-sm font-semibold">Reorder Lvl</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>`;
+        }
+
+        function handleAddMasterProduct() {
+            const name = document.getElementById('newMasterProductName').value.trim();
+            const price = parseFloat(document.getElementById('newMasterProductPrice').value);
+            const vendor = document.getElementById('newMasterProductVendor').value.trim();
+            const bookPageNo = document.getElementById('newMasterProductBookPageNo').value.trim();
+            const reorderLevel = parseInt(document.getElementById('newMasterProductReorderLevel').value);
+            const openingStock = parseInt(document.getElementById('newMasterProductOpeningStock').value);
+            const errorDiv = document.getElementById('master-error');
+
+            if (!name || isNaN(price) || price <= 0 || !vendor || !bookPageNo || isNaN(reorderLevel) || reorderLevel < 0 || isNaN(openingStock) || openingStock < 0) {
+                showError(errorDiv, 'Please fill all fields with valid data.');
+                return;
+            }
+            if (productMasters.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                showError(errorDiv, `Product "${name}" already exists.`);
+                return;
+            }
+            hideError(errorDiv);
+            productMasters.push({ id: Date.now(), name, price, vendor, bookPageNo, reorderLevel, openingStock, createdAt: new Date() });
+            if (openingStock > 0) {
+                const pIndex = products.findIndex(p => p.name === name);
+                if (pIndex > -1) products[pIndex].quantity += openingStock;
+                else products.push({ id: Date.now() + 1, name, quantity: openingStock, price, createdAt: new Date() });
+            }
+            saveData();
+            renderProductMaster(pageContainers.product_master);
+        }
+        
+        // --- RENDER COMPONENT: PURCHASE ---
+        function renderPurchase(container) {
+            const productOptions = productMasters.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Receive Stock (Purchase)</h1>
+                    <div id="purchase-error" class="hidden"></div>
+                    <div class="mb-8 p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Record Incoming Stock</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <select id="entryProductName" class="p-3 border rounded-lg bg-white"><option value="">Select Product</option>${productOptions}</select>
+                            <input id="entryQuantity" type="number" placeholder="Quantity Received" min="1" class="p-3 border rounded-lg">
+                            <input id="entryDate" type="date" value="${todayISO()}" class="p-3 border rounded-lg">
+                            <input id="invoiceNumber" type="text" placeholder="Invoice Number" class="p-3 border rounded-lg">
+                        </div>
+                        <button id="receive-stock-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">Receive Stock</button>
+                    </div>
+                    <div class="p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Purchase History</h2>
+                        <div id="purchase-history-list" class="overflow-x-auto"></div>
+                    </div>
+                </div>`;
+            renderPurchaseHistoryTable();
+            container.querySelector('#receive-stock-btn').addEventListener('click', handleReceiveStock);
+            const inputs = container.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        handleReceiveStock();
+                    }
+                });
+            });
+        }
+
+        function renderPurchaseHistoryTable() {
+            const listContainer = document.getElementById('purchase-history-list');
+            if(!listContainer) return;
+            if (stockEntryRecords.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-gray-600 py-4">No purchase entries yet.</p>`;
+                return;
+            }
+            const tableRows = [...stockEntryRecords]
+                .sort((a, b) => (b.enteredAt?.getTime() || 0) - (a.enteredAt?.getTime() || 0))
+                .map((r, i) => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3">${i + 1}</td>
+                        <td class="p-3">${r.productName}</td>
+                        <td class="p-3">${r.quantityReceived}</td>
+                        <td class="p-3">${r.invoiceNumber}</td>
+                        <td class="p-3">$${r.totalAmount.toFixed(2)}</td>
+                        <td class="p-3">${r.entryDate}</td>
+                    </tr>`).join('');
+            listContainer.innerHTML = `
+                <table class="min-w-full bg-white rounded-lg border">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="p-3 text-left text-sm font-semibold">Sno</th>
+                            <th class="p-3 text-left text-sm font-semibold">Product</th>
+                            <th class="p-3 text-left text-sm font-semibold">Qty</th>
+                            <th class="p-3 text-left text-sm font-semibold">Invoice No.</th>
+                            <th class="p-3 text-left text-sm font-semibold">Total</th>
+                            <th class="p-3 text-left text-sm font-semibold">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>`;
+        }
+
+        function handleReceiveStock() {
+            const pName = document.getElementById('entryProductName').value.trim();
+            const qty = parseInt(document.getElementById('entryQuantity').value);
+            const date = document.getElementById('entryDate').value;
+            const invNum = document.getElementById('invoiceNumber').value.trim();
+            const errorDiv = document.getElementById('purchase-error');
+
+            if (!pName || isNaN(qty) || qty <= 0 || !date || !invNum) {
+                showError(errorDiv, 'Please fill all fields with valid data.');
+                return;
+            }
+            const master = productMasters.find(p => p.name === pName);
+            if (!master) {
+                showError(errorDiv, `Product "${pName}" not in master list.`);
+                return;
+            }
+            hideError(errorDiv);
+            const pIndex = products.findIndex(p => p.name === pName);
+            if (pIndex > -1) {
+                products[pIndex].quantity += qty;
+                products[pIndex].createdAt = new Date();
+            } else {
+                products.push({ id: Date.now() + 1, name: pName, quantity: qty, price: master.price, createdAt: new Date() });
+            }
+            stockEntryRecords.push({ id: Date.now(), productName: pName, quantityReceived: qty, entryDate: date, invoiceNumber: invNum, totalAmount: qty * master.price, enteredAt: new Date() });
+            saveData();
+            renderPurchase(pageContainers.purchase);
+        }
+
+        // --- RENDER COMPONENT: ISSUED ---
+        function renderIssued(container) {
+            const stock = getCalculatedStock();
+            const productOptions = Object.keys(stock).filter(name => stock[name].calculatedClosingStock > 0)
+                .sort((a,b) => a.localeCompare(b))
+                .map(name => `<option value="${name}">${name} (Stock: ${stock[name].calculatedClosingStock})</option>`).join('');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Issue Products</h1>
+                    <div id="issued-error" class="hidden"></div>
+                    <div class="mb-8 p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Issue Product Form</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <select id="issuedProductName" class="p-3 border rounded-lg bg-white"><option value="">Select Product</option>${productOptions}</select>
+                            <input id="issuedQuantity" type="number" placeholder="Quantity to Issue" min="1" class="p-3 border rounded-lg">
+                            <input id="issuedDate" type="date" value="${todayISO()}" class="p-3 border rounded-lg">
+                        </div>
+                        <button id="issue-product-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">Issue Product</button>
+                    </div>
+                    <div class="p-6 bg-gray-50 rounded-lg border">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Issued Products History</h2>
+                        <div id="issued-history-list" class="overflow-x-auto"></div>
+                    </div>
+                </div>`;
+            renderIssuedHistoryTable();
+            container.querySelector('#issue-product-btn').addEventListener('click', handleIssueProduct);
+            const inputs = container.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        handleIssueProduct();
+                    }
+                });
+            });
+        }
+
+        function renderIssuedHistoryTable() {
+            const listContainer = document.getElementById('issued-history-list');
+            if (!listContainer) return;
+            if (issuedRecords.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-gray-600 py-4">No products issued yet.</p>`;
+                return;
+            }
+            const tableRows = [...issuedRecords]
+                .sort((a, b) => (b.issuedAt?.getTime() || 0) - (a.issuedAt?.getTime() || 0))
+                .map((r, i) => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3">${i + 1}</td><td class="p-3">${r.productName}</td>
+                        <td class="p-3">${r.issuedQuantity}</td><td class="p-3">${r.issuedDate}</td>
+                    </tr>`).join('');
+            listContainer.innerHTML = `
+                <table class="min-w-full bg-white rounded-lg border">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="p-3 text-left text-sm font-semibold">Sno</th>
+                            <th class="p-3 text-left text-sm font-semibold">Product</th>
+                            <th class="p-3 text-left text-sm font-semibold">Qty Issued</th>
+                            <th class="p-3 text-left text-sm font-semibold">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>`;
+        }
+
+        function handleIssueProduct() {
+            const pName = document.getElementById('issuedProductName').value.trim();
+            const qty = parseInt(document.getElementById('issuedQuantity').value);
+            const date = document.getElementById('issuedDate').value;
+            const errorDiv = document.getElementById('issued-error');
+
+            if (!pName || isNaN(qty) || qty <= 0 || !date) {
+                showError(errorDiv, 'Please fill all fields with valid data.');
+                return;
+            }
+            const availableStock = getCalculatedStock()[pName]?.calculatedClosingStock || 0;
+            if (availableStock < qty) {
+                showError(errorDiv, `Insufficient stock. Only ${availableStock} available.`);
+                return;
+            }
+            hideError(errorDiv);
+            const pIndex = products.findIndex(p => p.name === pName);
+            if (pIndex > -1) products[pIndex].quantity -= qty;
+            issuedRecords.push({ id: Date.now(), productName: pName, issuedQuantity: qty, issuedDate: date, issuedAt: new Date() });
+            saveData();
+            renderIssued(pageContainers.issued);
+        }
+        
+        // --- RENDER COMPONENT: INVENTORY REPORT ---
+        function renderInventoryReport(container, filterProduct = 'all') {
+            const productOptions = productMasters.map(p => `<option value="${p.name}" ${filterProduct === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
+            const reportData = generateReportData(filterProduct);
+            const tableRows = reportData.map((d, i) => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3">${i + 1}</td><td class="p-3">${d.productName}</td>
+                    <td class="p-3">${d.openingStock}</td><td class="p-3">${d.totalPurchase}</td>
+                    <td class="p-3">${d.totalIssued}</td><td class="p-3">${d.calculatedClosingStock}</td>
+                    <td class="p-3">${d.remarks}</td>
+                </tr>`).join('');
+
+            container.innerHTML = `
+                 <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Inventory Report</h1>
+                    
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border flex flex-col md:flex-row gap-4 items-center">
+                        <label for="product-filter" class="font-semibold text-gray-700">Filter by Product:</label>
+                        <select id="product-filter" class="p-2 border rounded-lg bg-white flex-grow">
+                            <option value="all" ${filterProduct === 'all' ? 'selected' : ''}>All Products</option>
+                            ${productOptions}
+                        </select>
+                        <button id="filter-report-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Filter</button>
+                    </div>
+
+                    ${reportData.length === 0 ? `<p class="text-center py-4">No data to display for the selected filter.</p>` : `
+                    <div class="flex justify-end gap-4 mb-4">
+                        <button id="export-csv-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md">Export CSV</button>
+                        <button id="export-pdf-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md">Export PDF</button>
+                    </div>
+                    <div id="inventory-report-table-container" class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg border">
+                            <thead class="bg-gray-200">
+                                <tr>
+                                    <th class="p-3 text-left text-sm font-semibold">Sno</th><th class="p-3 text-left text-sm font-semibold">Product</th>
+                                    <th class="p-3 text-left text-sm font-semibold">Opening</th><th class="p-3 text-left text-sm font-semibold">Purchase</th>
+                                    <th class="p-3 text-left text-sm font-semibold">Issued</th><th class="p-3 text-left text-sm font-semibold">Closing</th>
+                                    <th class="p-3 text-left text-sm font-semibold">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>`}
+                </div>`;
+            
+            container.querySelector('#filter-report-btn').addEventListener('click', () => {
+                const selectedProduct = document.getElementById('product-filter').value;
+                renderInventoryReport(container, selectedProduct);
+            });
+
+            if (reportData.length > 0) {
+                container.querySelector('#export-csv-btn').addEventListener('click', () => promptForDateRange('csv'));
+                container.querySelector('#export-pdf-btn').addEventListener('click', () => promptForDateRange('pdf'));
+            }
+        }
+        
+        // --- REPORTING AND UTILITY FUNCTIONS ---
+        function generateReportData(filterProduct = 'all') {
+            const data = {};
+            productMasters.forEach(m => { data[m.name] = { productName: m.name, openingStock: m.openingStock || 0, totalPurchase: 0, totalIssued: 0, remarks: '' }; });
+            stockEntryRecords.forEach(r => { if (data[r.productName]) data[r.productName].totalPurchase += r.quantityReceived; });
+            issuedRecords.forEach(r => { if (data[r.productName]) data[r.productName].totalIssued += r.issuedQuantity; });
+            
+            let reportData = Object.values(data);
+
+            if (filterProduct !== 'all') {
+                reportData = reportData.filter(d => d.productName === filterProduct);
+            }
+
+            reportData.forEach(d => {
+                const p = products.find(prod => prod.name === d.productName);
+                d.currentPhysicalStock = p ? p.quantity : 0;
+                d.calculatedClosingStock = d.openingStock + d.totalPurchase - d.totalIssued;
+                d.remarks = d.calculatedClosingStock === d.currentPhysicalStock ? 'OK' : `Discrepancy: Calc (${d.calculatedClosingStock}) vs Phys (${d.currentPhysicalStock})`;
+            });
+            return reportData.sort((a, b) => a.productName.localeCompare(b.productName));
+        }
+        
+        function promptForDateRange(format) {
+            const modalHTML = `
+                <div class="modal-backdrop fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 max-w-md w-full relative">
+                        <button class="close-modal-btn absolute top-3 right-3 text-2xl font-bold">&times;</button>
+                        <h2 class="text-center text-2xl font-bold mb-4">Select Export Date Range</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="from-date" class="block font-semibold mb-1">From Date:</label>
+                                <input id="from-date" type="date" value="${todayISO()}" class="p-2 border rounded-lg w-full">
+                            </div>
+                            <div>
+                                <label for="to-date" class="block font-semibold mb-1">To Date:</label>
+                                <input id="to-date" type="date" value="${todayISO()}" class="p-2 border rounded-lg w-full">
+                            </div>
+                        </div>
+                        <button id="confirm-export-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">Confirm Export</button>
+                    </div>
+                </div>`;
+            showModal(modalHTML);
+            document.getElementById('confirm-export-btn').addEventListener('click', () => {
+                const fromDate = document.getElementById('from-date').value;
+                const toDate = document.getElementById('to-date').value;
+                if(fromDate && toDate) {
+                    handleFilteredExport(format, fromDate, toDate);
+                    closeModal();
+                } else {
+                    alert('Please select both a from and to date.');
+                }
+            });
+        }
+
+        function handleFilteredExport(format, fromDateStr, toDateStr) {
+            const fromDate = new Date(fromDateStr);
+            const toDate = new Date(toDateStr);
+            toDate.setHours(23, 59, 59, 999); // Include the whole end day
+
+            const allTransactions = [];
+            productMasters.forEach(m => { if (m.openingStock > 0) allTransactions.push({ date: new Date(m.createdAt), type: 'Opening Stock', pName: m.name, qty: m.openingStock, remarks: 'Initial stock' }); });
+            stockEntryRecords.forEach(r => allTransactions.push({ date: new Date(r.enteredAt), type: 'Purchase', pName: r.productName, qty: r.quantityReceived, remarks: `Inv: ${r.invoiceNumber}` }));
+            issuedRecords.forEach(r => allTransactions.push({ date: new Date(r.issuedAt), type: 'Issued', pName: r.productName, qty: r.issuedQuantity, remarks: `Issued on ${r.issuedDate}` }));
+            
+            const filteredTransactions = allTransactions
+                .filter(t => t.date >= fromDate && t.date <= toDate)
+                .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+            if (format === 'csv') {
+                const headers = ["Date", "Type", "Product Name", "Quantity", "Remarks"];
+                let csv = headers.join(",") + "\n";
+                filteredTransactions.forEach(t => {
+                    csv += [formatDisplayDate(t.date), t.type, t.pName, t.qty, `"${t.remarks}"`].join(",") + "\n";
+                });
+                const link = document.createElement("a");
+                link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+                link.download = `transactions_${fromDateStr}_to_${toDateStr}.csv`;
+                link.click();
+            } else if (format === 'pdf') {
+                const tableRows = filteredTransactions.map((t, i) => `
+                    <tr>
+                        <td class="p-2 border">${i + 1}</td><td class="p-2 border">${formatDisplayDate(t.date)}</td>
+                        <td class="p-2 border">${t.type}</td><td class="p-2 border">${t.pName}</td>
+                        <td class="p-2 border">${t.qty}</td><td class="p-2 border">${t.remarks}</td>
+                    </tr>`).join('');
+                
+                const exportTable = `
+                    <div id="pdf-export-content" style="padding: 20px;">
+                        <h2 style="text-align: center; font-size: 24px; margin-bottom: 20px;">Transaction Report (${fromDateStr} to ${toDateStr})</h2>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead style="background-color: #e2e8f0;">
+                                <tr>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Sno</th>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Date</th>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Type</th>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Product</th>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Qty</th>
+                                    <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>`;
+                
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = exportTable;
+                document.body.appendChild(tempDiv);
+                
+                const element = document.getElementById('pdf-export-content');
+                html2pdf().from(element).set({ margin: 10, filename: `transactions_${fromDateStr}_to_${toDateStr}.pdf`, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }).save().then(() => {
+                    document.body.removeChild(tempDiv);
+                });
+            }
+        }
+        
+        // --- RENDER COMPONENT: STOCK DAILY ENTRY ---
+        function renderStockDailyEntry(container, filterProduct = 'all') {
+            const productOptions = productMasters.map(p => `<option value="${p.name}" ${filterProduct === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
+            
+            let allTransactions = [];
+            productMasters.forEach(m => { if (m.openingStock > 0) allTransactions.push({ date: new Date(m.createdAt), type: 'Opening Stock', pName: m.name, qty: m.openingStock, remarks: 'Initial stock' }); });
+            stockEntryRecords.forEach(r => allTransactions.push({ date: new Date(r.enteredAt), type: 'Purchase', pName: r.productName, qty: r.quantityReceived, remarks: `Inv: ${r.invoiceNumber}` }));
+            issuedRecords.forEach(r => allTransactions.push({ date: new Date(r.issuedAt), type: 'Issued', pName: r.productName, qty: r.issuedQuantity, remarks: `Issued on ${r.issuedDate}` }));
+            
+            let filteredTransactions = allTransactions;
+            if (filterProduct !== 'all') {
+                filteredTransactions = allTransactions.filter(t => t.pName === filterProduct);
+            }
+            
+            filteredTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+            
+            const tableRows = filteredTransactions.map((t, i) => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3">${i + 1}</td><td class="p-3">${formatDisplayDate(t.date)}</td>
+                    <td class="p-3">${t.type}</td><td class="p-3">${t.pName}</td>
+                    <td class="p-3">${t.qty}</td><td class="p-3">${t.remarks}</td>
+                </tr>`).join('');
+            
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Stock Daily Entry</h1>
+
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border flex flex-col md:flex-row gap-4 items-center">
+                        <label for="daily-entry-product-filter" class="font-semibold text-gray-700">Filter by Product:</label>
+                        <select id="daily-entry-product-filter" class="p-2 border rounded-lg bg-white flex-grow">
+                            <option value="all" ${filterProduct === 'all' ? 'selected' : ''}>All Products</option>
+                            ${productOptions}
+                        </select>
+                        <button id="filter-daily-entry-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Filter</button>
+                    </div>
+
+                    ${filteredTransactions.length === 0 ? `<p class="text-center py-4">No daily entries to display for this filter.</p>` : `
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg border">
+                             <thead class="bg-gray-200"><tr>
+                                <th class="p-3 text-left text-sm font-semibold">Sno</th><th class="p-3 text-left text-sm font-semibold">Date</th>
+                                <th class="p-3 text-left text-sm font-semibold">Type</th><th class="p-3 text-left text-sm font-semibold">Product</th>
+                                <th class="p-3 text-left text-sm font-semibold">Qty</th><th class="p-3 text-left text-sm font-semibold">Remarks</th>
+                            </tr></thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>`}
+                </div>`;
+            
+            container.querySelector('#filter-daily-entry-btn').addEventListener('click', () => {
+                const selectedProduct = document.getElementById('daily-entry-product-filter').value;
+                renderStockDailyEntry(container, selectedProduct);
+            });
+        }
+
+        // --- RENDER COMPONENT: DASHBOARD ---
+        function renderDashboard(container) {
+            const pCount = products.length;
+            const totalQty = products.reduce((sum, p) => sum + p.quantity, 0);
+            const totalValue = products.reduce((sum, p) => sum + (p.quantity * p.price), 0);
+            const lowStockCount = products.filter(p => { const m = productMasters.find(master => master.name === p.name); return m && p.quantity < m.reorderLevel; }).length;
+            const purchaseTotal = stockEntryRecords.reduce((sum, r) => sum + r.totalAmount, 0);
+            const invoices = [...new Set(stockEntryRecords.map(r => r.invoiceNumber).filter(Boolean))];
+            const recent = [...products].sort((a,b) => (b.createdAt?.getTime()||0)-(a.createdAt?.getTime()||0)).slice(0,5)
+                .map((p,i) => `<tr class="border-b hover:bg-gray-50"><td class="p-3">${i+1}</td><td class="p-3">${p.name}</td><td class="p-3">$${p.price.toFixed(2)}</td></tr>`).join('');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full border">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Stock Dashboard</h1>
+                    ${pCount === 0 ? `<p class="text-center py-4">No products in stock. Add items via 'Purchase' tab.</p>` : `
+                        <div class="mb-8 p-6 bg-gray-50 rounded-lg border">
+                            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Search Product Details</h2>
+                            <div id="search-error" class="hidden"></div>
+                            <div class="flex flex-col md:flex-row gap-4">
+                                <input id="searchTerm" type="text" placeholder="Enter Product Name" class="flex-grow p-3 border rounded-lg">
+                                <button id="search-product-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">Search</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-md"><p class="text-xl font-bold">$${totalValue.toFixed(2)}</p><p class="text-sm">Total Stock Value</p></div>
+                            <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-md"><p class="text-xl font-bold">${pCount}</p><p class="text-sm">Unique Products</p></div>
+                            <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-md"><p class="text-xl font-bold">${totalQty}</p><p class="text-sm">Total Quantity</p></div>
+                            <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-lg shadow-md"><p class="text-xl font-bold">${lowStockCount}</p><p class="text-sm">Low Stock Items</p></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-orange-100 p-6 rounded-lg shadow-sm border text-center"><p class="text-3xl font-bold text-orange-600">$${purchaseTotal.toFixed(2)}</p><p class="text-sm text-orange-800">Total Purchase</p></div>
+                            <button id="show-invoices-btn" class="bg-gray-100 hover:bg-gray-200 p-6 rounded-lg shadow-sm border text-center"><p class="text-3xl font-bold text-gray-600">${invoices.length}</p><p class="text-sm">Purchase Invoices</p></button>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-lg border">
+                            <h3 class="text-xl font-semibold text-gray-700 mb-4">Recently Added Products</h3>
+                            ${recent ? `<div class="overflow-x-auto"><table class="min-w-full bg-white rounded-lg"><thead class="bg-gray-200"><tr><th class="p-3 text-left text-sm font-semibold">Sno</th><th class="p-3 text-left text-sm font-semibold">Product</th><th class="p-3 text-left text-sm font-semibold">Price</th></tr></thead><tbody>${recent}</tbody></table></div>` : `<p>No recent products.</p>`}
+                        </div>`}
+                </div>`;
+            if (pCount > 0) {
+                container.querySelector('#search-product-btn').addEventListener('click', handleSearchProduct);
+                container.querySelector('#searchTerm').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        handleSearchProduct();
+                    }
+                });
+                container.querySelector('#show-invoices-btn').addEventListener('click', () => showInvoiceListModal(invoices));
+            }
+        }
+        
+        function handleSearchProduct() {
+            const searchTerm = document.getElementById('searchTerm').value.trim();
+            const errorDiv = document.getElementById('search-error');
+            if (!searchTerm) { showError(errorDiv, 'Please enter a product name.'); return; }
+            
+            const foundMaster = productMasters.find(pm => pm.name.toLowerCase() === searchTerm.toLowerCase());
+            if (!foundMaster) {
+                showError(errorDiv, `Product "${searchTerm}" not found in Product Master.`);
+                return;
+            }
+
+            const foundProduct = products.find(p => p.name.toLowerCase() === searchTerm.toLowerCase());
+            hideError(errorDiv);
+            showProductDetailsModal({
+                productName: foundMaster.name,
+                quantity: foundProduct ? foundProduct.quantity : 0, 
+                bookPageNo: foundMaster.bookPageNo || 'N/A',
+                reorderLevel: foundMaster.reorderLevel || 'N/A',
+            });
+        }
+
+        // --- MODAL LOGIC ---
+        function showModal(content) {
+            modalContainer.innerHTML = content;
+            const modal = modalContainer.querySelector('.modal-backdrop');
+            setTimeout(() => modal.classList.add('active'), 10);
+            modal.addEventListener('click', (e) => { if (e.target === modal || e.target.classList.contains('close-modal-btn')) closeModal(); });
+        }
+
+        function closeModal() {
+            const modal = modalContainer.querySelector('.modal-backdrop');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.addEventListener('transitionend', () => modalContainer.innerHTML = '', { once: true });
+            }
+        }
+        
+        function showProductDetailsModal(data) {
+            showModal(`
+                <div class="modal-backdrop fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full relative">
+                        <button class="close-modal-btn absolute top-3 right-3 text-2xl font-bold">&times;</button>
+                        <div class="flex justify-center mb-6"><img src="https://placehold.co/150x150/E0F2FE/0C4A6E?text=Product" alt="Product" class="rounded-full shadow-md"></div>
+                        <h2 class="text-center text-3xl font-extrabold mb-4">${data.productName}</h2>
+                        <div class="grid gap-3 font-medium">
+                            <div class="flex justify-between items-center bg-blue-50 p-3 rounded-lg"><span>Quantity:</span><span class="font-bold text-blue-800">${data.quantity}</span></div>
+                            <div class="flex justify-between items-center bg-green-50 p-3 rounded-lg"><span>Book Page:</span><span class="font-bold text-green-800">${data.bookPageNo}</span></div>
+                            <div class="flex justify-between items-center bg-purple-50 p-3 rounded-lg"><span>Reorder Level:</span><span class="font-bold text-purple-800">${data.reorderLevel}</span></div>
+                        </div>
+                    </div>
+                </div>`);
+        }
+
+        function showInvoiceListModal(invoices) {
+            const buttons = invoices.map(inv => `<button data-invoice="${inv}" class="invoice-link-btn w-full text-left py-3 px-4 mb-2 bg-blue-50 hover:bg-blue-100 rounded-lg font-semibold">${inv}</button>`).join('');
+            showModal(`
+                <div class="modal-backdrop fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full relative">
+                        <button class="close-modal-btn absolute top-3 right-3 text-2xl font-bold">&times;</button>
+                        <h2 class="text-center text-3xl font-extrabold mb-4">Purchase Invoices</h2>
+                        <div class="max-h-80 overflow-y-auto">${buttons || '<p class="text-center text-gray-500">No invoices.</p>'}</div>
+                    </div>
+                </div>`);
+            document.querySelectorAll('.invoice-link-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                const invNum = e.currentTarget.dataset.invoice;
+                const items = stockEntryRecords.filter(r => r.invoiceNumber === invNum);
+                const total = items.reduce((sum, item) => sum + item.totalAmount, 0);
+                showInvoiceDetailsModal({ invoiceNumber: invNum, items, totalAmount: total });
+            }));
+        }
+
+        function showInvoiceDetailsModal(data) {
+            const rows = data.items.map(item => `<tr><td class="p-2">${item.productName}</td><td class="p-2">${item.quantityReceived}</td></tr>`).join('');
+            showModal(`
+                <div class="modal-backdrop fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 max-w-md w-full relative">
+                        <button class="close-modal-btn absolute top-3 right-3 text-2xl font-bold">&times;</button>
+                        <h2 class="text-center text-2xl font-bold mb-2">Invoice: ${data.invoiceNumber}</h2>
+                        <p class="text-center text-lg mb-6">Total: $${data.totalAmount.toFixed(2)}</p>
+                        <h3 class="text-xl font-semibold mb-3">Items:</h3>
+                        <table class="min-w-full bg-white text-sm"><thead class="bg-gray-200"><tr><th class="p-2 text-left">Product</th><th class="p-2 text-left">Qty</th></tr></thead><tbody class="divide-y">${rows}</tbody></table>
+                    </div>
+                </div>`);
+        }
+        
+        // --- ERROR HANDLING & UTILITIES ---
+        function showError(element, message) {
+            element.className = "bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4";
+            element.innerHTML = `<strong class="font-bold">Error:</strong> <span class="block sm:inline ml-2">${message}</span>`;
+        }
+
+        function hideError(element) {
+            element.className = "hidden";
+            element.innerHTML = "";
+        }
+        
+        function getCalculatedStock() {
+            const stock = {};
+            productMasters.forEach(m => { stock[m.name] = { calculatedClosingStock: m.openingStock || 0 }; });
+            stockEntryRecords.forEach(r => { if (stock[r.productName]) stock[r.productName].calculatedClosingStock += r.quantityReceived; });
+            issuedRecords.forEach(r => { if (stock[r.productName]) stock[r.productName].calculatedClosingStock -= r.issuedQuantity; });
+            return stock;
+        }
+
+        // --- INITIALIZATION ---
+        navigateTo('dashboard');
+    });
+    </script>
+</body>
+</html>
